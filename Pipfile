@@ -13,6 +13,8 @@ alembic = "*"
 redis = "*"
 asyncpg = "*"
 psycopg = {extras = ["binary"], version = "*"}
+prometheus-client = "*"
+locust = "*"
 
 [dev-packages]
 pytest = "*"
