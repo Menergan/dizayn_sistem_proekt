@@ -1,4 +1,14 @@
 services:
+  external-services:
+    build:
+      context: .
+      dockerfile: external_services/Dockerfile
+    ports:
+      - "3629:3629"
+    environment:
+      RENTAL_CALLBACK_URL: ${RENTAL_CALLBACK_URL:-http://rental-api:8000/station-events/powerbank-returned}
+      EMULATOR_TIMEOUT_SECONDS: ${EMULATOR_TIMEOUT_SECONDS:-3}
+
   postgres:
     image: postgres:17-alpine
     environment:

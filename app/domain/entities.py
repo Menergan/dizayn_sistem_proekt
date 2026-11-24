@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -34,6 +34,7 @@ class UserProfile:
 class AppConfig:
     last_banks_increase: Decimal
     tariffs_ttl_seconds: int
+    retention_days_by_country: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
