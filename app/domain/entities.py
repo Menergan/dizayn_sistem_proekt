@@ -67,6 +67,27 @@ class Rental:
     finish_station_id: str | None = None
     finished_at: datetime | None = None
     total_amount: Decimal | None = None
+    delete_after: datetime | None = None
+
+
+@dataclass(frozen=True)
+class PaymentOperation:
+    rental_id: UUID
+    operation_type: str
+    idempotency_key: str
+    amount: Decimal
+    status: str
+    external_operation_id: str | None = None
+    external_response: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class StationEvent:
+    id: str
+    station_id: str
+    powerbank_id: str
+    returned_at: datetime
+    rental_id: UUID | None = None
 
 
 @dataclass(frozen=True)

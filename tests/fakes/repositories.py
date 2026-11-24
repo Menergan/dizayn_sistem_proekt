@@ -1,8 +1,10 @@
+from dataclasses import replace
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
-from app.domain.entities import Offer, Rental
-from app.domain.enums import OfferStatus, RentalStatus
+from app.domain.entities import Offer, PaymentOperation, Rental, StationEvent
+from app.domain.enums import OfferStatus, PaymentOperationStatus, RentalStatus
 
 
 class FakeOfferRepository:
@@ -58,3 +60,72 @@ class FakeRentalRepository:
         rental = self.rentals[rental_id]
         rental.status = status
         return rental
+
+    async def delete_expired(self, before: datetime, limit: int) -> int:
+        expired = [
+            rental_id
+            for rental_id, rental in self.rentals.items()
+            if rental.delete_after is not None and rental.delete_after <= before
+        ][:limit]
+        for rental_id in expired:
+            del self.rentals[rental_id]
+        return len(expired)
+
+
+class FakeStationEventRepository:
+    def __init__(self) -> None:
+        self.events: dict[str, StationEvent] = {}
+
+    async def save_if_new(self, event: StationEvent) -> bool:
+        if event.id in self.events:
+            return False
+        self.events[event.id] = event
+        return True
+
+
+class FakePaymentOperationRepository:
+    def __init__(self) -> None:
+        self.operations: dict[tuple[UUID, str], PaymentOperation] = {}
+
+    async def get_or_create_key(
+        self, rental_id: UUID, operation_type: str, amount: Decimal
+    ) -> str:
+        operation_key = (rental_id, operation_type)
+        operation = self.operations.get(operation_key)
+        if operation is not None:
+            if operation.amount != amount:
+                raise ValueError("Payment operation amount differs from the saved amount")
+            return operation.idempotency_key
+        idempotency_key = f"rental:{rental_id}:{operation_type.lower()}"
+        self.operations[operation_key] = PaymentOperation(
+            rental_id=rental_id,
+            operation_type=operation_type,
+            idempotency_key=idempotency_key,
+            amount=amount,
+            status=PaymentOperationStatus.PENDING.value,
+        )
+        return idempotency_key
+
+    async def save_result(
+        self,
+        rental_id: UUID,
+        operation_type: str,
+        status: str,
+        external_operation_id: str | None,
+        external_response: dict[str, object] | None,
+    ) -> None:
+        operation_key = (rental_id, operation_type)
+        operation = self.operations.get(operation_key)
+        if operation is None:
+            raise LookupError("Payment operation was not found")
+        self.operations[operation_key] = replace(
+            operation,
+            status=status,
+            external_operation_id=external_operation_id,
+            external_response=external_response,
+        )
+
+    async def get(
+        self, rental_id: UUID, operation_type: str
+    ) -> PaymentOperation | None:
+        return self.operations.get((rental_id, operation_type))

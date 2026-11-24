@@ -19,3 +19,9 @@ class PaymentOperationType(StrEnum):
     RESERVE = "RESERVE"
     CAPTURE = "CAPTURE"
     RELEASE = "RELEASE"
+
+
+class PaymentOperationStatus(StrEnum):
+    PENDING = "PENDING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"

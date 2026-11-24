@@ -1,6 +1,11 @@
 from app.ports.cache import Cache
 from app.ports.clients import ConfigClient, PaymentClient, StationClient, TariffClient, UserClient
-from app.ports.repositories import OfferRepository, PaymentOperationRepository, RentalRepository
+from app.ports.repositories import (
+    OfferRepository,
+    PaymentOperationRepository,
+    RentalRepository,
+    StationEventRepository,
+)
 
 __all__ = [
     "Cache",
@@ -10,6 +15,7 @@ __all__ = [
     "PaymentOperationRepository",
     "RentalRepository",
     "StationClient",
+    "StationEventRepository",
     "TariffClient",
     "UserClient",
 ]

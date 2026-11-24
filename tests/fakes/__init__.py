@@ -6,14 +6,21 @@ from tests.fakes.clients import (
     FakeTariffClient,
     FakeUserClient,
 )
-from tests.fakes.repositories import FakeOfferRepository, FakeRentalRepository
+from tests.fakes.repositories import (
+    FakeOfferRepository,
+    FakePaymentOperationRepository,
+    FakeRentalRepository,
+    FakeStationEventRepository,
+)
 
 __all__ = [
     "FakeCache",
     "FakeConfigClient",
     "FakeOfferRepository",
+    "FakePaymentOperationRepository",
     "FakePaymentClient",
     "FakeRentalRepository",
+    "FakeStationEventRepository",
     "FakeStationClient",
     "FakeTariffClient",
     "FakeUserClient",

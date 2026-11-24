@@ -8,9 +8,11 @@ fastapi = "*"
 uvicorn = "*"
 requests = "*"
 httpx = "*"
-sqlalchemy = "*"
+sqlalchemy = {extras = ["asyncio"], version = "*"}
 alembic = "*"
 redis = "*"
+asyncpg = "*"
+psycopg = {extras = ["binary"], version = "*"}
 
 [dev-packages]
 pytest = "*"
