@@ -7,8 +7,14 @@ name = "pypi"
 fastapi = "*"
 uvicorn = "*"
 requests = "*"
+httpx = "*"
+sqlalchemy = "*"
+alembic = "*"
+redis = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-asyncio = "*"
 
 [requires]
 python_version = "3.13"
