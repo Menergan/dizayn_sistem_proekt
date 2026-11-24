@@ -140,7 +140,9 @@ async def send_return_event(event: ReturnEvent):
         events[event_id] = payload
     url = os.getenv("RENTAL_CALLBACK_URL", "http://rental-api:8000/station-events/powerbank-returned")
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+        token = os.getenv("STATION_CALLBACK_TOKEN")
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), headers=headers) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
     except httpx.HTTPError as exc:

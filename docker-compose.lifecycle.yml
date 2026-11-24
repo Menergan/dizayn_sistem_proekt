@@ -1,0 +1,45 @@
+services:
+  external-services:
+    environment:
+      STATION_CALLBACK_TOKEN: ${STATION_CALLBACK_TOKEN:?Set a station callback token}
+  migrate:
+    build:
+      context: .
+      dockerfile: app/lifecycle/Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_MIGRATIONS_URL: postgresql+psycopg://rental:rental@postgres:5432/rental
+    depends_on:
+      postgres:
+        condition: service_healthy
+  rental-api:
+    build:
+      context: .
+      dockerfile: app/lifecycle/Dockerfile
+    ports:
+      - "8000:8000"
+    environment: &lifecycle-env
+      DATABASE_URL: postgresql+asyncpg://rental:rental@postgres:5432/rental
+      REDIS_URL: redis://redis:6379/0
+      EXTERNAL_SERVICES_URL: http://external-services:3629
+      STATION_CALLBACK_TOKEN: ${STATION_CALLBACK_TOKEN:?Set a station callback token}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      external-services:
+        condition: service_started
+    restart: on-failure
+  lifecycle-worker:
+    build:
+      context: .
+      dockerfile: app/lifecycle/Dockerfile
+    command: ["python", "-m", "app.lifecycle.worker"]
+    environment: *lifecycle-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      external-services:
+        condition: service_started
+    restart: on-failure
