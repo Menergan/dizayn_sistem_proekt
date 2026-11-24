@@ -283,7 +283,7 @@ Worker раз в час удаляет
 
 ### Технологический стек
 
-- **Язык:** Python 3.12.
+- **Язык:** Python 3.13.
 - **HTTP API:** FastAPI.
 - **Работа с PostgreSQL:** SQLAlchemy 2 и Alembic для миграций.
 - **Работа с Redis:** redis-py.
