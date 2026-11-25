@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -5,7 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 
 def create_session_factory(database_url: str) -> async_sessionmaker[AsyncSession]:
-    engine = create_async_engine(database_url, pool_pre_ping=True)
+    engine = create_async_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_size=int(os.getenv("DATABASE_POOL_SIZE", "20")),
+        max_overflow=int(os.getenv("DATABASE_MAX_OVERFLOW", "20")),
+        pool_timeout=float(os.getenv("DATABASE_POOL_TIMEOUT_SECONDS", "2")),
+    )
     return async_sessionmaker(engine, expire_on_commit=False)
 
 

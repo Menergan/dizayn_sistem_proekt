@@ -23,3 +23,14 @@ RENTAL_CACHE_ERRORS = Counter(
     "Rental Redis cache errors",
     ["operation"],
 )
+
+RENTAL_CACHE_OPERATION_DURATION = Histogram(
+    "rental_cache_operation_duration_seconds",
+    "Rental Redis operation duration",
+    ["operation"],
+)
+
+RENTAL_DATABASE_FALLBACK_REJECTED = Counter(
+    "rental_database_fallback_rejected_total",
+    "Rejected rental database fallbacks",
+)

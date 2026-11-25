@@ -1,4 +1,5 @@
 
+import os
 import random
 from pathlib import Path
 
@@ -6,6 +7,7 @@ from locust import HttpUser, task, constant_throughput
 
 
 IDS_FILE = Path(__file__).parent / "rental_ids.txt"
+TASKS_PER_SECOND = float(os.getenv("LOCUST_TASKS_PER_SECOND", "10"))
 
 with IDS_FILE.open(encoding="utf-8") as file:
     RENTAL_IDS = [line.strip() for line in file if line.strip()]
@@ -15,8 +17,7 @@ if not RENTAL_IDS:
 
 
 class RentalUser(HttpUser):
-    # 10 запросов в секунду на одного пользователя.
-    wait_time = constant_throughput(10)
+    wait_time = constant_throughput(TASKS_PER_SECOND)
 
     @task
     def read_rental(self):

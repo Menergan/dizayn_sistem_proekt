@@ -1,15 +1,21 @@
-from app.observability.metrics import (
-    RENTAL_CACHE_ERRORS,
-    RENTAL_CACHE_REQUESTS,
-)
-
+import asyncio
 import json
+import logging
+import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
+from redis.exceptions import RedisError
 
 from app.domain.entities import Rental
 from app.domain.enums import RentalStatus
+from app.observability.metrics import (
+    RENTAL_CACHE_ERRORS,
+    RENTAL_CACHE_OPERATION_DURATION,
+    RENTAL_CACHE_REQUESTS,
+    RENTAL_DATABASE_FALLBACK_REJECTED,
+)
 from app.ports.cache import Cache
 from app.ports.repositories import RentalRepository
 from app.schemas.rentals import RentalResponse
@@ -17,9 +23,14 @@ from app.schemas.rentals import RentalResponse
 
 CACHE_TTL_SECONDS = 300
 CACHE_KEY_PREFIX = "rental:"
+logger = logging.getLogger(__name__)
 
 
 class RentalNotFoundError(Exception):
+    pass
+
+
+class RentalReadUnavailableError(Exception):
     pass
 
 
@@ -28,9 +39,17 @@ class RentalReadService:
         self,
         repository: RentalRepository,
         cache: Cache,
+        database_fallback_limit: int | None = None,
     ) -> None:
         self._repository = repository
         self._cache = cache
+        self._database_fallback_timeout = float(
+            os.getenv("RENTAL_DATABASE_FALLBACK_TIMEOUT_SECONDS", "0.05")
+        )
+        self._database_fallback = asyncio.BoundedSemaphore(
+            database_fallback_limit
+            or int(os.getenv("RENTAL_DATABASE_FALLBACK_MAX_CONCURRENCY", "100"))
+        )
 
     async def get(
         self,
@@ -42,36 +61,54 @@ class RentalReadService:
 
         rental = None
 
-        # Redis is an optimization, not a source of truth.
         try:
-            cached = await self._cache.get(key)
+            with RENTAL_CACHE_OPERATION_DURATION.labels(operation="get").time():
+                cached = await self._cache.get(key)
 
             if cached is not None:
                 rental = self._deserialize(cached)
                 RENTAL_CACHE_REQUESTS.labels(result="hit").inc()
             else:
                 RENTAL_CACHE_REQUESTS.labels(result="miss").inc()
-
-        except Exception:
+        except (RedisError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
             RENTAL_CACHE_ERRORS.labels(operation="get").inc()
+            logger.warning("rental_cache_get_failed", exc_info=exc)
             rental = None
 
         if rental is None:
-            rental = await self._repository.get(rental_id)
+            async with self._database_fallback_slot():
+                rental = await self._repository.get(rental_id)
 
             if rental is None:
                 raise RentalNotFoundError(str(rental_id))
 
             try:
-                await self._cache.set(
-                    key,
-                    self._serialize(rental),
-                    CACHE_TTL_SECONDS,
-                )
-            except Exception:
-                pass
+                with RENTAL_CACHE_OPERATION_DURATION.labels(operation="set").time():
+                    await self._cache.set(
+                        key,
+                        self._serialize(rental),
+                        CACHE_TTL_SECONDS,
+                    )
+            except (RedisError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+                RENTAL_CACHE_ERRORS.labels(operation="set").inc()
+                logger.warning("rental_cache_set_failed", exc_info=exc)
 
         return self._to_response(rental, now)
+
+    @asynccontextmanager
+    async def _database_fallback_slot(self):
+        try:
+            await asyncio.wait_for(
+                self._database_fallback.acquire(),
+                timeout=self._database_fallback_timeout,
+            )
+        except TimeoutError as exc:
+            RENTAL_DATABASE_FALLBACK_REJECTED.inc()
+            raise RentalReadUnavailableError("Rental storage is busy") from exc
+        try:
+            yield
+        finally:
+            self._database_fallback.release()
 
     @staticmethod
     def _serialize(rental: Rental) -> bytes:
@@ -143,8 +180,6 @@ class RentalReadService:
         if duration_seconds < rental.free_period_min * 60:
             return Decimal("0")
 
-        # Preserve the original business rule:
-        # charge for each complete hour of the rental duration.
         full_hours = int(duration_seconds // 3600)
         amount = Decimal(full_hours) * rental.price_per_hour
 

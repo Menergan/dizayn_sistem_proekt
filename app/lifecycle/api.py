@@ -1,4 +1,3 @@
-"""Combined entrypoint, preserving participant 3's existing app and routes."""
 import os
 import secrets
 from contextlib import asynccontextmanager
@@ -21,7 +20,7 @@ async def lifespan(application):
     if not os.getenv("STATION_CALLBACK_TOKEN"):
         raise RuntimeError("STATION_CALLBACK_TOKEN is required")
     async with original_lifespan(application):
-        async with runtime() as service:
+        async with runtime(application) as service:
             application.state.lifecycle = service
             yield
 
